@@ -1,23 +1,11 @@
-import json
 import uuid
 import hashlib
 
-from django.core.exceptions import ObjectDoesNotExist
-from django import views
-from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
-from rest_framework.exceptions import ValidationError
-
-from rest_framework import mixins, generics, permissions
+from rest_framework import generics, permissions
 # Create your views here.
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.renderers import HTMLFormRenderer, BrowsableAPIRenderer, JSONRenderer
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
-from permissions import ProductPermissionAny
+from serializer_lesson.paginations import UserPaginationClass
+from serializer_lesson.permissions import ProductPermissionAny
 from serializer_lesson.models import ProductCategory, User, Product
-from serializer_lesson.parsers import P1902Parser
-from serializer_lesson.renderers import P1902Renderer
 from serializer_lesson.serializers import ProductCategorySerializer, UserSerializer, ProductSerializer
 
 
@@ -54,7 +42,7 @@ class ProductCategoryView(generics.ListAPIView,
                generics.RetrieveAPIView,
                generics.UpdateAPIView,
                generics.DestroyAPIView):
-    permission_classes = (ProductCategoryView,)
+    permission_classes = (ProductPermissionAny,)
     serializer_class = ProductCategorySerializer
     queryset = ProductCategory.objects.filter(parent=None)
 # class UserView(views.View):
@@ -176,8 +164,9 @@ class UserView(generics.ListAPIView,
                generics.DestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,ProductPermissionAny)
+    # permission_classes = (permissions.IsAuthenticatedOrReadOnly,ProductPermissionAny)
 
+    pagination_class = UserPaginationClass
     def get(self,request,pk=None,*args,**kwargs):
         if pk is None:
             return generics.ListAPIView.get(self,request,*args,**kwargs)
