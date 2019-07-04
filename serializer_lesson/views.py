@@ -7,47 +7,56 @@ from django import views
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from rest_framework.exceptions import ValidationError
 
-from rest_framework import mixins,generics
+from rest_framework import mixins, generics, permissions
 # Create your views here.
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.renderers import HTMLFormRenderer, BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from serializer_lesson.models import ProductCategory, User
+from permissions import ProductPermissionAny
+from serializer_lesson.models import ProductCategory, User, Product
 from serializer_lesson.parsers import P1902Parser
 from serializer_lesson.renderers import P1902Renderer
-from serializer_lesson.serializers import ProductCategorySerializer, UserSerializer
+from serializer_lesson.serializers import ProductCategorySerializer, UserSerializer, ProductSerializer
 
 
-class ProductCategoryView(views.View):
-    def get(self,request,pk=None,*args,**kwargs):
-        if pk is None:
-            catagories=ProductCategory.objects.filter(parent=None)
-            objs=ProductCategorySerializer(instance=catagories,many=True)
-            # for c in catagories:
-            #     m=ProductCategorySerializer(instance=c)
-            #     catagory_set.append(m.data)
-            return JsonResponse(json.loads(json.dumps(objs.data),strict=False),safe=False)
+# class ProductCategoryView(views.View):
+#     def get(self,request,pk=None,*args,**kwargs):
+#         if pk is None:
+#             catagories=ProductCategory.objects.filter(parent=None)
+#             objs=ProductCategorySerializer(instance=catagories,many=True)
+#             # for c in catagories:
+#             #     m=ProductCategorySerializer(instance=c)
+#             #     catagory_set.append(m.data)
+#             return JsonResponse(json.loads(json.dumps(objs.data),strict=False),safe=False)
+#
+#         else:
+#             try:
+#                 category=ProductCategory.objects.get(pk=pk)
+#                 pm=ProductCategorySerializer(instance=category)
+#                 return JsonResponse(pm.data)
+#             except ObjectDoesNotExist:
+#                 return HttpResponseBadRequest()
+#
+#     def post(self,request,pk=None,*args,**kwargs):
+#         if pk is None:
+#             m=ProductCategorySerializer(data={'name':request.POST['name'],
+#                                               'title':request.POST['title']})
+#             if not m.is_valid():
+#                 return HttpResponseBadRequest()
+#             c=m.save()
+#             return JsonResponse(m.data)
+#         return HttpResponseBadRequest()
 
-        else:
-            try:
-                category=ProductCategory.objects.get(pk=pk)
-                pm=ProductCategorySerializer(instance=category)
-                return JsonResponse(pm.data)
-            except ObjectDoesNotExist:
-                return HttpResponseBadRequest()
-
-    def post(self,request,pk=None,*args,**kwargs):
-        if pk is None:
-            m=ProductCategorySerializer(data={'name':request.POST['name'],
-                                              'title':request.POST['title']})
-            if not m.is_valid():
-                return HttpResponseBadRequest()
-            c=m.save()
-            return JsonResponse(m.data)
-        return HttpResponseBadRequest()
-
+class ProductCategoryView(generics.ListAPIView,
+               generics.CreateAPIView,
+               generics.RetrieveAPIView,
+               generics.UpdateAPIView,
+               generics.DestroyAPIView):
+    permission_classes = (ProductCategoryView,)
+    serializer_class = ProductCategorySerializer
+    queryset = ProductCategory.objects.filter(parent=None)
 # class UserView(views.View):
 #     def get(self, request, *args, **kwargs):
 #         return HttpResponse("SUCCESS")
@@ -137,12 +146,27 @@ class UserListView(generics.ListAPIView,
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def perform_create(self, serializer):
+        salt=uuid.uuid4().hex
+        password=hashlib.md5((serializer.validated_data['password']+salt).encode("utf-8")).hexdigest()
+        serializer.save(password=password,salt=salt)
+
 # 创建详情视图
 class UserDetailView(generics.RetrieveAPIView,
                      generics.UpdateAPIView,
                      generics.DestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
+class ProductView(generics.ListAPIView,
+               generics.CreateAPIView,
+               generics.RetrieveAPIView,
+               generics.UpdateAPIView,
+               generics.DestroyAPIView):
+    serializer_class = ProductSerializer
+    queryset = Product.objects.all()
+    permission_classes = (ProductPermissionAny,)
+
 
 # 将列表视图与详情视图绑定
 class UserView(generics.ListAPIView,
@@ -152,6 +176,7 @@ class UserView(generics.ListAPIView,
                generics.DestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,ProductPermissionAny)
 
     def get(self,request,pk=None,*args,**kwargs):
         if pk is None:
@@ -160,6 +185,11 @@ class UserView(generics.ListAPIView,
         else:
             return generics.RetrieveAPIView.get(self,request,*args,**kwargs)
             # super(generics.RetrieveAPIView.get(self,request,*args,**kwargs))
+
+    def perform_create(self, serializer):
+        salt=uuid.uuid4().hex
+        password=hashlib.md5((serializer.validated_data['password'] + salt).encode("utf-8")).hexdigest()
+        serializer.save(password=password, salt=salt)
 
 
 
